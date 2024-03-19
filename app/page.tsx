@@ -153,7 +153,7 @@ export default function Page() {
         handleActiveElement={handleActiveElement}
       />
       <section className="flex flex-row h-full">
-        <LeftSidebar />
+        <LeftSidebar allShapes={Array.from(canvasObjects)} />
         <Live canvasRef={canvasRef} />
         <RightSidebar />
       </section>
