@@ -8,6 +8,8 @@ import {
   handleCanvasMouseDown,
   handleCanvasMouseUp,
   handleCanvasObjectModified,
+  handleCanvasObjectScaling,
+  handleCanvasSelectionCreated,
   handleCanvaseMouseMove,
   handleResize,
   initializeFabric,
@@ -16,13 +18,23 @@ import {
 import { handleDelete, handleKeyDown } from "@/lib/key-events";
 import { handleImageUpload } from "@/lib/shapes";
 import { useMutation, useRedo, useStorage, useUndo } from "@/liveblocks.config";
-import { ActiveElement } from "@/types/type";
+import { ActiveElement, Attributes } from "@/types/type";
 import { fabric } from "fabric";
 import { useEffect, useRef, useState } from "react";
 
 export default function Page() {
   const undo = useUndo();
   const redo = useRedo();
+
+  const [elementAttributes, setElementAttributes] = useState<Attributes>({
+    width: "",
+    height: "",
+    fontSize: "",
+    fontFamily: "",
+    fontWeight: "",
+    fill: "#aabbcc",
+    stroke: "#aabbcc",
+  });
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricRef = useRef<fabric.Canvas | null>(null);
@@ -31,6 +43,7 @@ export default function Page() {
   const selectedShapeRef = useRef<string | null>(null);
   const activeObjectRef = useRef<fabric.Object | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const isEditingRef = useRef(false);
 
   const canvasObjects = useStorage((root) => root.canvasObjects);
 
@@ -83,6 +96,7 @@ export default function Page() {
       case "delete":
         handleDelete(fabricRef.current as any, deleteShapeFromStorage);
         setActiveElement(defaultNavElement);
+        break;
       case "image":
         imageInputRef.current?.click();
         isDrawing.current = false;
@@ -142,6 +156,21 @@ export default function Page() {
       });
     });
 
+    canvas.on("selection:created", (options) => {
+      handleCanvasSelectionCreated({
+        options,
+        isEditingRef,
+        setElementAttributes,
+      });
+    });
+
+    canvas.on("object:scaling", (options) => {
+      handleCanvasObjectScaling({
+        options,
+        setElementAttributes,
+      });
+    });
+
     window.addEventListener("resize", () => {
       handleResize({ canvas });
     });
@@ -189,7 +218,14 @@ export default function Page() {
       <section className="flex flex-row h-full">
         <LeftSidebar allShapes={Array.from(canvasObjects)} />
         <Live canvasRef={canvasRef} />
-        <RightSidebar />
+        <RightSidebar
+          elementAttributes={elementAttributes}
+          setElementAttributes={setElementAttributes}
+          fabricRef={fabricRef}
+          activeObjectRef={activeObjectRef}
+          isEditingRef={isEditingRef}
+          syncShapeInStorage={syncShapeInStorage}
+        />
       </section>
     </main>
   );
