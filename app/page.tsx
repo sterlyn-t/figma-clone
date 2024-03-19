@@ -5,9 +5,13 @@ import Navbar from "@/components/Navbar";
 import RightSidebar from "@/components/RightSidebar";
 import {
   handleCanvasMouseDown,
+  handleCanvasMouseUp,
+  handleCanvaseMouseMove,
   handleResize,
   initializeFabric,
+  renderCanvas,
 } from "@/lib/canvas";
+import { useMutation, useStorage } from "@/liveblocks.config";
 import { ActiveElement } from "@/types/type";
 import { fabric } from "fabric";
 import { useEffect, useRef, useState } from "react";
@@ -18,6 +22,22 @@ export default function Page() {
   const isDrawing = useRef(false);
   const shapeRef = useRef<fabric.Object | null>(null);
   const selectedShapeRef = useRef<string | null>("rectangle");
+  const activeObjectRef = useRef<fabric.Object | null>(null);
+
+  const canvasObjects = useStorage((root) => root.canvasObjects);
+
+  const syncShapeInStorage = useMutation(({ storage }, object) => {
+    if (!object) return;
+
+    const { objectId } = object;
+
+    const shapeData = object.toJSON();
+    shapeData.objectId = objectId;
+
+    const canvasObjects = storage.get("canvasObjects");
+
+    canvasObjects.set(objectId, shapeData);
+  }, []);
 
   const [activeElement, setActiveElement] = useState<ActiveElement>({
     name: "",
@@ -44,10 +64,41 @@ export default function Page() {
       });
     });
 
+    canvas.on("mouse:move", (options) => {
+      handleCanvaseMouseMove({
+        options,
+        canvas,
+        isDrawing,
+        shapeRef,
+        selectedShapeRef,
+        syncShapeInStorage,
+      });
+    });
+
+    canvas.on("mouse:up", () => {
+      handleCanvasMouseUp({
+        canvas,
+        isDrawing,
+        shapeRef,
+        selectedShapeRef,
+        syncShapeInStorage,
+        setActiveElement,
+        activeObjectRef,
+      });
+    });
+
     window.addEventListener("resize", () => {
       handleResize({ canvas });
     });
   }, []);
+
+  useEffect(() => {
+    renderCanvas({
+      fabricRef,
+      canvasObjects,
+      activeObjectRef,
+    });
+  }, [canvasObjects]);
 
   return (
     <main className="h-screen overflow-hidden">
